@@ -75,6 +75,7 @@ if __name__ == '__main__':
         particle.gpuShape = gpuCircle
         particle.initial_velocity = 0.01/5
         particle.velocity = particle.initial_velocity
+        # particle.clock.initial_time = glfw.get_time()
         particle_array.append(particle)
 
     clock = Timer()
@@ -88,9 +89,7 @@ if __name__ == '__main__':
         clock.current_time = glfw.get_time()
         clock.update()
         time_up = clock.seconds_has_passed(3)
-
         for particle in particle_array:
-
             if time_up:
                 particle.check_events()
 

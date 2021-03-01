@@ -1,6 +1,26 @@
 import numpy as np
 from OpenGL.GL import *
+# import glfw
 import transformations as tr
+
+
+# class Timer:
+#     def __init__(self):
+#         self.initial_time = 0
+#         self.current_time = 0
+#         self.seconds_passed = 0
+#
+#     def update(self):
+#         self.seconds_passed = self.current_time - self.initial_time
+#
+#     def seconds_has_passed(self, seconds):
+#         if self.current_time == 0:
+#             return False
+#         if self.seconds_passed >= seconds:
+#             self.initial_time = glfw.get_time()
+#             return True
+#         else:
+#             return False
 
 
 class Particle:
@@ -33,6 +53,10 @@ class Particle:
 
         self.velocity = 0
 
+        # self.clock = Timer()
+
+        self.acceleration_factor = 1
+
     def check_events(self):
         if self.activeEvent is not None:
             return
@@ -64,18 +88,33 @@ def change_direction(particle):
         particle.x_vector = - particle.x_vector
         particle.y_vector = - particle.y_vector
         particle.activeEvent = 'reverse_change_direction'
-        return
 
 
 def reverse_change_direction(particle):
     particle.velocity += particle.initial_velocity / 30
     if particle.velocity >= particle.initial_velocity:
         particle.activeEvent = None
+
+
+def vertical_acceleration(particle):
+    particle.acceleration_factor += 0.01
+    if particle.acceleration_factor >= 3:
+        particle.activeEvent = None
         return
+    particle.y_vector = abs(particle.y_vector) * particle.acceleration_factor / particle.y_vector
+
+
+def vertical_deceleration(particle):
+    particle.acceleration_factor -= 0.01
+    if particle.acceleration_factor <= 0.5:
+        particle.activeEvent = None
+        return
+    particle.y_vector = abs(particle.y_vector) * particle.acceleration_factor / particle.y_vector
 
 
 def select_event(particle):
-    particle.activeEvent = np.random.choice([None, 'change_direction'], p=[0.9, 0.1])
+    particle.activeEvent = np.random.choice(
+        [None, 'change_direction', 'vertical_acceleration', 'vertical_deceleration'], p=[0.6, 0.1, 0.2, 0.1])
 
 
 def apply_active_event(particle):
@@ -83,3 +122,7 @@ def apply_active_event(particle):
         change_direction(particle)
     elif particle.activeEvent == 'reverse_change_direction':
         reverse_change_direction(particle)
+    elif particle.activeEvent == 'vertical_acceleration':
+        vertical_acceleration(particle)
+    elif particle.activeEvent == 'vertical_deceleration':
+        vertical_deceleration(particle)
