@@ -14,6 +14,27 @@ import transformations as tr
 # import json
 import my_shapes as my
 import particleclass as pr
+
+
+class Timer:
+    def __init__(self):
+        self.initial_time = 0
+        self.current_time = 0
+        self.seconds_passed = 0
+
+    def update(self):
+        self.seconds_passed = self.current_time - self.initial_time
+
+    def seconds_has_passed(self, seconds):
+        if self.current_time == 0:
+            return False
+        if self.seconds_passed >= seconds:
+            self.initial_time = glfw.get_time()
+            return True
+        else:
+            return False
+
+
 if __name__ == '__main__':
     # Initialize glfw
     if not glfw.init():
@@ -38,7 +59,7 @@ if __name__ == '__main__':
     width_square = 1
     height_square = proportion
     radius_circle = 0.02
-    particle_amount = 10
+    particle_amount = 20
     # Creando figuras
     circle = my.createCircle(30, 0, 0, 1, radius_circle, proportion)
     square = my.createSquare(width_square, height_square)
@@ -50,25 +71,30 @@ if __name__ == '__main__':
     particle_array = []
     for i in range(particle_amount):
         particle = pr.Particle(width_square, height_square, radius_circle, proportion)
-        particle.set_pipeline(figurePipeline)
-        particle.set_gpuShape(gpuCircle)
+        particle.pipeline = figurePipeline
+        particle.gpuShape = gpuCircle
+        particle.initial_velocity = 0.01/5
+        particle.velocity = particle.initial_velocity
         particle_array.append(particle)
 
-    t0 = glfw.get_time()
+    clock = Timer()
+    clock.initial_time = glfw.get_time()
     while not glfw.window_should_close(window):
         glfw.poll_events()
 
         # Clearing the screen in both, color and depth
         glClear(GL_COLOR_BUFFER_BIT)
 
-        t1 = glfw.get_time()
-        dt = t1 - t0
-        t0 = t1
-
-        velocity = dt/5
+        clock.current_time = glfw.get_time()
+        clock.update()
+        time_up = clock.seconds_has_passed(3)
 
         for particle in particle_array:
-            particle.update(velocity)
+
+            if time_up:
+                particle.check_events()
+
+            particle.update()
             particle.draw()
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
