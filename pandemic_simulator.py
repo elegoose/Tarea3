@@ -13,7 +13,7 @@ import easy_shaders as es
 import transformations as tr
 # import json
 import my_shapes as my
-import numpy as np
+import particleclass as pr
 if __name__ == '__main__':
     # Initialize glfw
     if not glfw.init():
@@ -38,7 +38,7 @@ if __name__ == '__main__':
     width_square = 1
     height_square = proportion
     radius_circle = 0.02
-
+    particle_amount = 10
     # Creando figuras
     circle = my.createCircle(30, 0, 0, 1, radius_circle, proportion)
     square = my.createSquare(width_square, height_square)
@@ -46,37 +46,37 @@ if __name__ == '__main__':
     # Almacenando figuras en GPU
     gpuCircle = es.toGPUShape(circle)
     gpuSquare = es.toGPUShape(square)
-    x = np.random.uniform(-width_square/2 + radius_circle, width_square/2 - radius_circle)
-    y = np.random.uniform(-height_square/2 + radius_circle * proportion, height_square/2 - radius_circle * proportion)
-    x_vector = np.random.choice([-1, 1])
-    y_vector = np.random.choice([-1, 1])
+
+    particle_array = []
+    for i in range(particle_amount):
+        particle = pr.Particle(width_square, height_square, radius_circle, proportion)
+        particle.set_pipeline(figurePipeline)
+        particle.set_gpuShape(gpuCircle)
+        particle_array.append(particle)
+
     t0 = glfw.get_time()
     while not glfw.window_should_close(window):
         glfw.poll_events()
 
+        # Clearing the screen in both, color and depth
+        glClear(GL_COLOR_BUFFER_BIT)
+
         t1 = glfw.get_time()
         dt = t1 - t0
         t0 = t1
+
         velocity = dt/5
-        # Clearing the screen in both, color and depth
-        glClear(GL_COLOR_BUFFER_BIT)
-        x += velocity * x_vector
-        y += velocity * y_vector
-        if x + radius_circle >= width_square/2 or x - radius_circle <= -width_square/2:
-            x_vector = - x_vector
-        if y + radius_circle*proportion >= height_square/2 or y - radius_circle*proportion <= -height_square/2:
-            y_vector = - y_vector
-        glUseProgram(figurePipeline.shaderProgram)
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-        glUniformMatrix4fv(glGetUniformLocation(figurePipeline.shaderProgram, 'transform'), 1, GL_TRUE,
-                           tr.translate(x, y, 0))
-        figurePipeline.drawShape(gpuCircle)
+
+        for particle in particle_array:
+            particle.update(velocity)
+            particle.draw()
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
         glLineWidth(3)
         glUniformMatrix4fv(glGetUniformLocation(figurePipeline.shaderProgram, 'transform'), 1, GL_TRUE,
                            tr.identity())
         figurePipeline.drawShape(gpuSquare)
+
         glfw.swap_buffers(window)
 
     glfw.terminate()

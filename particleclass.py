@@ -1,12 +1,15 @@
 import numpy as np
 from OpenGL.GL import *
 import transformations as tr
+
+
 class Particle:
     def __init__(self, width_square, height_square, radius_circle, proportion):
 
         self.x = np.random.uniform(-width_square / 2 + radius_circle, width_square / 2 - radius_circle)
 
-        self.y = np.random.uniform(-height_square/2 + radius_circle * proportion, height_square/2 - radius_circle * proportion)
+        self.y = np.random.uniform(-height_square / 2 + radius_circle * proportion,
+                                   height_square / 2 - radius_circle * proportion)
 
         self.x_vector = np.random.choice([-1, 1])
 
@@ -27,7 +30,7 @@ class Particle:
     def set_pipeline(self, pipeline):
         self.pipeline = pipeline
 
-    def set_gpuShape(self, shape):
+    def set_gpuShape(self, shape): # noqa
         self.gpuShape = shape
 
     def update(self, velocity):
@@ -38,8 +41,8 @@ class Particle:
 
             self.x_vector = - self.x_vector
 
-        if self.y_vector + self.radius_circle * self.proportion >= self.height_square / 2 or\
-                self.y_vector - self.radius_circle * self.proportion <= -self.height_square / 2:
+        if self.y + self.radius_circle * self.proportion >= self.height_square / 2 or \
+                self.y - self.radius_circle * self.proportion <= -self.height_square / 2:
 
             self.y_vector = - self.y_vector
 
