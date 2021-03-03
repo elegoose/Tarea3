@@ -17,6 +17,20 @@ import my_shapes as my
 import particleclass as pr
 import numpy as np
 
+class Controller:
+    def __init__(self):
+        self.pause = False
+
+controller = Controller()
+
+def on_key(window, key, scancode, action, mods):
+    if action != glfw.PRESS:
+        return
+
+    global controller
+
+    if key == glfw.KEY_P:
+        controller.pause = not controller.pause
 
 class Timer:
     def __init__(self):
@@ -55,8 +69,8 @@ def check_nearby_particles(this_particle, my_particle_array):
         distance = np.sqrt(dx ** 2 + dy ** 2)
         if distance < \
                 this_particle.radius_circle + near_particle.radius_circle + virus.radius and \
-                this_particle.isInfected and not near_particle.isInfected and \
-                near_particle.state not in ['dead', 'recovered']:
+                this_particle.state == 'infected' and \
+                near_particle.state == 'susceptible':
             choice = np.random.choice([None, 'infect'],
                                       p=[1 - virus.contagious_prob, virus.contagious_prob])
             if choice == 'infect':
@@ -75,6 +89,7 @@ if __name__ == '__main__':
         glfw.terminate()
         sys.exit()
     glfw.make_context_current(window)
+    glfw.set_key_callback(window, on_key)
 
     glEnable(GL_BLEND)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -87,13 +102,13 @@ if __name__ == '__main__':
     figurePipeline = es.SimpleTransformShaderProgram()
 
     # Estableciendo medidas
-    width_square = 1
-    height_square = proportion
-    square_scale = 1/2
-    width_square *= square_scale
-    height_square *= square_scale
+    width_square = 0.5
+    height_square = width_square*proportion
+    # square_scale = 1 / 2
+    # width_square *= square_scale
+    # height_square *= square_scale
     radius_circle = 0.01
-    particle_amount = 60
+    particle_amount = 30
     # Creando figuras
     circle = my.createCircle(30, 0, 0, 1, radius_circle, proportion)
     square = my.createSquare(width_square, height_square)
@@ -103,7 +118,7 @@ if __name__ == '__main__':
     gpuSquare = es.toGPUShape(square)
 
     # Virus variables
-    virus_radius = 0.02
+    virus_radius = 0.03
     virus_contagious_prob = 0.2
     virus_death_rate = 0.1
     virus_days_to_heal = 5
@@ -116,8 +131,8 @@ if __name__ == '__main__':
         particle.set_initial_pos()
         particle.pipeline = figurePipeline
         particle.gpuShape = gpuCircle
-        particle.initial_velocity = 0.01 / 5
-        particle.initial_velocity *= square_scale
+        particle.initial_velocity = 0.01 / 6
+        # particle.initial_velocity *= square_scale
         particle.velocity = particle.initial_velocity
         particle.virus = virus
         particle_array.append(particle)
@@ -129,9 +144,10 @@ if __name__ == '__main__':
     dayCounter = Timer()
     dayCounter.initial_time = glfw.get_time()
     dayCount = 0
+    deathCount = 0
+    pause = False
     while not glfw.window_should_close(window):
         susceptibleCount = 0
-        deathCount = 0
         recoveredCount = 0
         infectedCount = 0
 
@@ -139,43 +155,66 @@ if __name__ == '__main__':
 
         # Clearing the screen in both, color and depth
         glClear(GL_COLOR_BUFFER_BIT)
+        if not controller.pause:
 
-        dayCounter.update()
-        # Every two seconds, a day passes
-        dayPassed = dayCounter.seconds_has_passed(1)
-        clock.update()
-        time_up = clock.seconds_has_passed(5)
-        for particle in particle_array:
-            if 0.5 >= dayCounter.seconds_passed >= 0.4:
-                check_nearby_particles(particle, particle_array)
-
-            if dayPassed:
-                if particle.isInfected:
-                    particle.daysInfected += 1
+            dayCounter.update()
+            # Every one second, a day passes
+            dayPassed = dayCounter.seconds_has_passed(1)
+            clock.update()
+            time_up = clock.seconds_has_passed(5)
+            for particle in particle_array:
+                if 0.5 >= dayCounter.seconds_passed >= 0.4:
+                    check_nearby_particles(particle, particle_array)
+                if particle.state == 'infected':
                     infectedCount += 1
-                elif particle.state == 'susceptible':
+                if particle.state == 'susceptible':
                     susceptibleCount += 1
-                elif particle.state == 'recovered':
+                if particle.state == 'recovered':
                     recoveredCount += 1
-                else:
+                if particle.state == 'dead' and particle.count:
+                    particle.count = False
                     deathCount += 1
+                if dayPassed:
+                    particle.dayPassed = True
+                    if particle.state == 'infected':
+                        particle.daysInfected += 1
+                    if particle.state == 'dead':
+                        particle.dissapear()
+                        # particle_array.remove(particle)
 
-            if time_up:
-                # Check random movement events every 5 seconds
-                particle.check_events()
-                if particle.state == 'dead':
-                    particle_array.remove(particle)
+                else:
+                    particle.dayPassed = False
+                if time_up:
+                    # Check random movement events every 5 seconds
+                    particle.check_events()
 
-            particle.update()
-            particle.draw()
+                particle.update()
+                particle.draw()
 
-        if dayPassed:
-            dayCount += 1
-            print('day:', dayCount)
-            print('susceptible:', susceptibleCount)
-            print('recovered:', recoveredCount)
-            print('dead:', deathCount)
-
+            # print('infected:', infectedCount)
+            # print('susceptible:', susceptibleCount)
+            # print('recovered:', recoveredCount)
+            # print('dead:', deathCount)
+            # total = susceptibleCount + recoveredCount + deathCount + infectedCount
+            # print("total:", total)
+            # print("--------")
+            if dayPassed:
+                dayCount += 1
+                print('day:', dayCount)
+                print('infected:', infectedCount)
+                print('susceptible:', susceptibleCount)
+                print('recovered:', recoveredCount)
+                print('dead:', deathCount)
+                total = susceptibleCount + recoveredCount + deathCount + infectedCount
+                print("total:", total)
+                print("--------")
+                if total != particle_amount:
+                    controller.pause = True
+                    print("ERROR!!!!! AAAAAAAAAAA")
+        else:
+            for particle in particle_array:
+                particle.draw()
+        glUseProgram(figurePipeline.shaderProgram)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
         glLineWidth(3)
         glUniformMatrix4fv(glGetUniformLocation(figurePipeline.shaderProgram, 'transform'), 1, GL_TRUE,
