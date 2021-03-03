@@ -46,6 +46,23 @@ class Virus:
         self.days_to_heal = days_to_heal
 
 
+def check_nearby_particles(this_particle, my_particle_array):
+    aux_particle_array = list(my_particle_array)
+    aux_particle_array.remove(this_particle)
+    for near_particle in aux_particle_array:
+        dx = this_particle.x - near_particle.x
+        dy = this_particle.y - near_particle.y
+        distance = np.sqrt(dx ** 2 + dy ** 2)
+        if distance < \
+                this_particle.radius_circle + near_particle.radius_circle + virus.radius and \
+                this_particle.isInfected and not near_particle.isInfected and \
+                near_particle.state not in ['dead', 'recovered']:
+            choice = np.random.choice([None, 'infect'],
+                                      p=[1 - virus.contagious_prob, virus.contagious_prob])
+            if choice == 'infect':
+                near_particle.infect()
+
+
 if __name__ == '__main__':
     # Initialize glfw
     if not glfw.init():
@@ -69,8 +86,11 @@ if __name__ == '__main__':
     # Estableciendo medidas
     width_square = 1
     height_square = proportion
-    radius_circle = 0.02
-    particle_amount = 30
+    square_scale = 1/2
+    width_square *= square_scale
+    height_square *= square_scale
+    radius_circle = 0.01
+    particle_amount = 60
     # Creando figuras
     circle = my.createCircle(30, 0, 0, 1, radius_circle, proportion)
     square = my.createSquare(width_square, height_square)
@@ -80,7 +100,7 @@ if __name__ == '__main__':
     gpuSquare = es.toGPUShape(square)
 
     # Virus variables
-    virus_radius = 0.05
+    virus_radius = 0.02
     virus_contagious_prob = 0.2
     virus_death_rate = 0.1
     virus_days_to_heal = 5
@@ -94,9 +114,12 @@ if __name__ == '__main__':
         particle.pipeline = figurePipeline
         particle.gpuShape = gpuCircle
         particle.initial_velocity = 0.01 / 5
+        particle.initial_velocity *= square_scale
         particle.velocity = particle.initial_velocity
         particle.virus = virus
         particle_array.append(particle)
+    particle_array[0].infect()  # Infect the first particle
+    particle_array[1].infect()
 
     clock = Timer()
     clock.initial_time = glfw.get_time()
@@ -111,27 +134,19 @@ if __name__ == '__main__':
 
         dayCounter.update()
         # Every two seconds, a day passes
-        dayPassed = dayCounter.seconds_has_passed(2)
-        if dayPassed:
-            dayCount += 1
-            print(dayCount)
+        dayPassed = dayCounter.seconds_has_passed(1)
         clock.update()
         time_up = clock.seconds_has_passed(5)
+        if dayPassed:
+            print(dayCount)
+            dayCount += 1
         for particle in particle_array:
+            if 0.5 >= dayCounter.seconds_passed >= 0.4:
+                check_nearby_particles(particle, particle_array)
 
-            aux_particle_array = list(particle_array)
-            aux_particle_array.remove(particle)
-            for aux_particle in aux_particle_array:
-                dx = particle.x - aux_particle.x
-                dy = particle.y - aux_particle.y
-                distance = np.sqrt(dx ** 2 + dy ** 2)
-                if distance < \
-                        particle.radius_circle + aux_particle.radius_circle + virus.radius and \
-                        dayPassed:
-                    choice = np.random.choice([None, 'infect'],
-                                              p=[1 - virus.contagious_prob, virus.contagious_prob])
-                    if choice == 'infect':
-                        aux_particle.infect()
+            if dayPassed:
+                if particle.isInfected:
+                    particle.daysInfected += 1
 
             if time_up:
                 # Check random movement events every 5 seconds

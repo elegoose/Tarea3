@@ -26,6 +26,12 @@ class Particle:
 
         self.virus = None
 
+        self.daysInfected = 0
+
+        self.transformation = tr.identity()
+
+        self.state = 'susceptible'
+
     def set_box_limits(self, width_square, height_square, radius_circle, proportion):
 
         self.width_square = width_square
@@ -51,17 +57,36 @@ class Particle:
         self.virus = virus
 
     def infect(self):
+        color = (1, 0, 0)  # red
         self.gpuShape = es.toGPUShape(
-            my.createCircle(30, 1, 0, 0, self.radius_circle, self.proportion)
+            my.createCircle(30, *color, self.radius_circle, self.proportion)
         )
         self.isInfected = True
-        
+
     def check_events(self):
         if self.activeEvent is not None:
             return
         select_event(self)
 
     def update(self):
+        if self.daysInfected >= 5 and self.state not in ['dead', 'recovered']:
+            choice = np.random.choice(['die', 'live'],
+                                      p=[
+                                          self.virus.death_rate,
+                                          1 - self.virus.death_rate
+                                      ])
+            if choice == 'die':
+                self.state = 'dead'
+                self.transformation = tr.uniformScale(0)
+                self.isInfected = False
+            else:
+                self.state = 'recovered'
+                color = (0.5, 0.5, 0.5)
+                self.gpuShape = es.toGPUShape(
+                    my.createCircle(30, *color, self.radius_circle, self.proportion)
+                )
+                self.isInfected = False
+
         apply_active_event(self)
         self.x += self.velocity * self.x_vector
         self.y += self.velocity * self.y_vector
@@ -77,7 +102,7 @@ class Particle:
         glUseProgram(self.pipeline.shaderProgram)
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
         glUniformMatrix4fv(glGetUniformLocation(self.pipeline.shaderProgram, 'transform'), 1, GL_TRUE,
-                           tr.translate(self.x, self.y, 0))
+                           tr.matmul([tr.translate(self.x, self.y, 0), self.transformation]))
         self.pipeline.drawShape(self.gpuShape)
 
 
