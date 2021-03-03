@@ -76,6 +76,9 @@ if __name__ == '__main__':
         sys.exit()
     glfw.make_context_current(window)
 
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
     # Estableciendo color de pantalla
     glClearColor(0.85, 0.85, 0.85, 1.0)
 
@@ -127,6 +130,11 @@ if __name__ == '__main__':
     dayCounter.initial_time = glfw.get_time()
     dayCount = 0
     while not glfw.window_should_close(window):
+        susceptibleCount = 0
+        deathCount = 0
+        recoveredCount = 0
+        infectedCount = 0
+
         glfw.poll_events()
 
         # Clearing the screen in both, color and depth
@@ -137,9 +145,6 @@ if __name__ == '__main__':
         dayPassed = dayCounter.seconds_has_passed(1)
         clock.update()
         time_up = clock.seconds_has_passed(5)
-        if dayPassed:
-            print(dayCount)
-            dayCount += 1
         for particle in particle_array:
             if 0.5 >= dayCounter.seconds_passed >= 0.4:
                 check_nearby_particles(particle, particle_array)
@@ -147,13 +152,29 @@ if __name__ == '__main__':
             if dayPassed:
                 if particle.isInfected:
                     particle.daysInfected += 1
+                    infectedCount += 1
+                elif particle.state == 'susceptible':
+                    susceptibleCount += 1
+                elif particle.state == 'recovered':
+                    recoveredCount += 1
+                else:
+                    deathCount += 1
 
             if time_up:
                 # Check random movement events every 5 seconds
                 particle.check_events()
+                if particle.state == 'dead':
+                    particle_array.remove(particle)
 
             particle.update()
             particle.draw()
+
+        if dayPassed:
+            dayCount += 1
+            print('day:', dayCount)
+            print('susceptible:', susceptibleCount)
+            print('recovered:', recoveredCount)
+            print('dead:', deathCount)
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
         glLineWidth(3)

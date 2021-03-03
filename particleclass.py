@@ -3,6 +3,7 @@ from OpenGL.GL import *
 import transformations as tr
 import my_shapes as my
 import easy_shaders as es
+import basic_shapes as bs
 
 
 class Particle:
@@ -76,9 +77,7 @@ class Particle:
                                           1 - self.virus.death_rate
                                       ])
             if choice == 'die':
-                self.state = 'dead'
-                self.transformation = tr.uniformScale(0)
-                self.isInfected = False
+                kill(self)
             else:
                 self.state = 'recovered'
                 color = (0.5, 0.5, 0.5)
@@ -86,8 +85,8 @@ class Particle:
                     my.createCircle(30, *color, self.radius_circle, self.proportion)
                 )
                 self.isInfected = False
-
-        apply_active_event(self)
+        if self.state != 'dead':
+            apply_active_event(self)
         self.x += self.velocity * self.x_vector
         self.y += self.velocity * self.y_vector
         if self.x + self.radius_circle >= self.width_square / 2 or \
@@ -104,6 +103,16 @@ class Particle:
         glUniformMatrix4fv(glGetUniformLocation(self.pipeline.shaderProgram, 'transform'), 1, GL_TRUE,
                            tr.matmul([tr.translate(self.x, self.y, 0), self.transformation]))
         self.pipeline.drawShape(self.gpuShape)
+
+
+def kill(particle):
+    particle.state = 'dead'
+    # particle.transformation = tr.uniformScale(0)
+    particle.isInfected = False
+    particle.pipeline = es.SimpleTextureTransformShaderProgram()
+    particle.gpuShape = es.toGPUShape(bs.createTextureQuad('x_texture.png'), GL_REPEAT, GL_NEAREST)
+    particle.velocity = 0
+    particle.transformation = tr.uniformScale(0.05)
 
 
 def select_event(particle):
