@@ -1,5 +1,12 @@
 # Autor : Felipe Torralba
-# Algunos comentarios y variables del código están en ingles por simplicidad y legibilidad de código
+# Algunos comentarios y variables del código están en ingles por simplicidad y legibilidad
+# Parámetro agregado: Days_to_get_infected, que indica la cantidad de días que deben pasar para que una partícula
+# vuelva a contagiarse luego de recuperarse.
+# Segundo parámetro agregado: Go_to_center_prob, que indica la probabilidad de que una partícula vaya al centro
+# en un día.
+# Tercer parámetro agregado: Visualization_mode, que permite ver la simulación en tiempo real o frame a frame,
+# presionando la tecla derecha (KEY_RIGHT)
+
 import glfw
 from OpenGL.GL import *
 import sys
@@ -24,6 +31,7 @@ class Controller:
         self.dayCount = 0
         self.particleAmount = 0
         self.print = False
+        self.nextFrame = False
 
     def print_particle_count(self):
         print("---------------")
@@ -61,6 +69,8 @@ def on_key(window, key, scancode, action, mods):  # noqa
         if controller.print:
             controller.print_particle_count()
             controller.draw_matplotlib()
+    if key == glfw.KEY_RIGHT:
+        controller.nextFrame = not controller.nextFrame
 
 
 class Timer:
@@ -112,6 +122,87 @@ def check_nearby_particles(this_particle, my_particle_array):
                 near_particle.infect()
 
 
+def continuous_mode():
+    if not controller.pause:
+
+        dayCounter.update()
+        # Every 3 days, 1 second passes
+        dayPassed = dayCounter.seconds_has_passed(1 / 3)
+
+        clock.update()
+        time_up = clock.seconds_has_passed(5)
+        for particle in particle_array:
+            if 0.5 / 3 >= dayCounter.seconds_passed >= 0.4 / 3:
+                check_nearby_particles(particle, particle_array)
+            if dayPassed:
+                particle.dayPassed = True
+                if particle.state == 'infected':
+                    particle.daysInfected += 1
+                if particle.state == 'recovered':
+                    particle.daysRecovered += 1
+                if particle.state == 'dead':
+                    particle.disappear()
+
+            else:
+                particle.dayPassed = False
+            if time_up:
+                # Check random movement events every 5 seconds
+                particle.check_events()
+
+            particle.update()
+            particle.draw()
+
+        if dayPassed:
+            graph.update()
+            controller.dayCount += 1
+            print('day:', controller.dayCount)
+    else:
+        for particle in particle_array:
+            particle.draw()
+
+
+def frame_by_frame_mode():
+    dayCounter.update()
+    secondsPerDay = 3
+    dayPassed = dayCounter.seconds_has_passed(1 * secondsPerDay)
+    if controller.nextFrame:
+        if not controller.pause:
+
+            clock.update()
+            time_up = clock.seconds_has_passed(5)
+            for particle in particle_array:
+                if dayPassed:
+                    check_nearby_particles(particle, particle_array)
+                    particle.dayPassed = True
+                    if particle.state == 'infected':
+                        particle.daysInfected += 1
+                    if particle.state == 'recovered':
+                        particle.daysRecovered += 1
+                    if particle.state == 'dead':
+                        particle.disappear()
+
+                else:
+                    particle.dayPassed = False
+                if time_up:
+                    # Check random movement events every 5 seconds
+                    particle.check_events()
+
+                particle.update()
+                particle.draw()
+
+            if dayPassed:
+                graph.update()
+                controller.dayCount += 1
+                print('day:', controller.dayCount)
+                controller.nextFrame = not controller.nextFrame
+        else:
+            for particle in particle_array:
+                particle.draw()
+    else:
+        for particle in particle_array:
+            particle.draw()
+
+
 if __name__ == '__main__':
 
     # Initialize glfw
@@ -152,14 +243,17 @@ if __name__ == '__main__':
     # Virus variables
     with open('virus.json') as f:
         data = json.load(f)
+    visualization_mode = data[0]['Visualization_mode']
     virus_data = data[0]
     virus = Virus(virus_data['Radius'],
                   virus_data['Contagious_prob'],
                   virus_data['Death_rate'],
                   virus_data['Days_to_heal'])
-
+    go_to_center_prob = virus_data['Go_to_center_prob']
+    days_to_be_susceptible = virus_data['Days_to_be_susceptible']
     particle_amount = virus_data['Initial_population']
     controller.susceptibleCount = particle_amount
+    controller.particleAmount = particle_amount
 
     particle_array = []
     for i in range(particle_amount):
@@ -168,16 +262,17 @@ if __name__ == '__main__':
         particle.set_initial_pos()
         particle.pipeline = figurePipeline
         particle.gpuShape = gpuCircle
-        particle.initial_velocity = 0.01 / 6
+        particle.initial_velocity = 0.01 / 10
         particle.velocity = particle.initial_velocity
         particle.virus = virus
         particle.controller = controller
+        particle.go_to_center_prob = go_to_center_prob
+        particle.days_to_be_susceptible = days_to_be_susceptible
         particle_array.append(particle)
     particle_array[0].infect()  # Infect the first particle
-    particle_array[1].infect()
+    particle_array[1].infect()  # Infect second particle
 
     # Opengl graph Values
-    controller.particleAmount = particle_amount
     graph = opengl_graph.Graph(controller, proportion)
 
     clock = Timer()
@@ -191,40 +286,12 @@ if __name__ == '__main__':
 
         # Clearing the screen in both, color and depth
         glClear(GL_COLOR_BUFFER_BIT)
-        if not controller.pause:
 
-            dayCounter.update()
-            # Every one second, a day passes
-            dayPassed = dayCounter.seconds_has_passed(1)
+        if visualization_mode == 'continuo':
+            continuous_mode()
+        elif visualization_mode == 'frame_by_frame':
+            frame_by_frame_mode()
 
-            clock.update()
-            time_up = clock.seconds_has_passed(5)
-            for particle in particle_array:
-                if 0.5 >= dayCounter.seconds_passed >= 0.4:
-                    check_nearby_particles(particle, particle_array)
-                if dayPassed:
-                    particle.dayPassed = True
-                    if particle.state == 'infected':
-                        particle.daysInfected += 1
-                    if particle.state == 'dead':
-                        particle.disappear()
-
-                else:
-                    particle.dayPassed = False
-                if time_up:
-                    # Check random movement events every 5 seconds
-                    particle.check_events()
-
-                particle.update()
-                particle.draw()
-
-            if dayPassed:
-                graph.update()
-                controller.dayCount += 1
-                print('day:', controller.dayCount)
-        else:
-            for particle in particle_array:
-                particle.draw()
         glUseProgram(figurePipeline.shaderProgram)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
         glLineWidth(3)
