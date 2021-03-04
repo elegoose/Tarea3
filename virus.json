@@ -3,7 +3,10 @@
     "Radius": 0.06,
     "Contagious_prob": 0.2,
     "Death_rate": 0.1,
-    "Initial_population": 60,
-    "Days_to_heal": 7
+    "Initial_population": 70,
+    "Days_to_heal": 5,
+    "Days_to_be_susceptible": 7,
+    "Go_to_center_prob": 0.1,
+    "Visualization_mode": "frame_by_frame"
   }
 ]
