@@ -33,7 +33,9 @@ class Particle:
 
         self.state = 'susceptible'
 
-        self.count = True
+        self.ignore = False
+
+        self.controller = None
 
     def set_box_limits(self, width_square, height_square, radius_circle, proportion):
 
@@ -60,6 +62,8 @@ class Particle:
         self.virus = virus
 
     def infect(self):
+        self.controller.infectedCount += 1
+        self.controller.susceptibleCount -= 1
         color = (1, 0, 0)  # red
         self.gpuShape = es.toGPUShape(
             my.createCircle(30, *color, self.radius_circle, self.proportion)
@@ -73,7 +77,7 @@ class Particle:
 
     def update(self):
         if self.dayPassed and self.state == 'infected':
-            if self.daysInfected < 5:
+            if self.daysInfected < self.virus.days_to_heal:
                 choice = np.random.choice(['die', 'live'],
                                           p=[
                                               self.virus.death_rate,
@@ -81,6 +85,8 @@ class Particle:
                                           ])
                 if choice == 'die':
                     kill(self)
+                    self.controller.deathCount += 1
+                    self.controller.infectedCount -= 1
             else:
                 choice = np.random.choice(['die', 'live'],
                                           p=[
@@ -89,8 +95,12 @@ class Particle:
                                           ])
                 if choice == 'die':
                     kill(self)
+                    self.controller.deathCount += 1
+                    self.controller.infectedCount -= 1
                 else:
                     recover(self)
+                    self.controller.recoveredCount += 1
+                    self.controller.infectedCount -= 1
 
         if self.state != 'dead':
             apply_active_event(self)
@@ -111,22 +121,27 @@ class Particle:
                            tr.matmul([tr.translate(self.x, self.y, 0), self.transformation]))
         self.pipeline.drawShape(self.gpuShape)
 
-    def dissapear(self):
+    def disappear(self):
         self.transformation = tr.uniformScale(0)
 
+
 def kill(particle):
+    particle.ignore = True
     particle.state = 'dead'
     particle.pipeline = es.SimpleTextureTransformShaderProgram()
     particle.gpuShape = es.toGPUShape(bs.createTextureQuad('x_texture.png'), GL_REPEAT, GL_NEAREST)
     particle.velocity = 0
     particle.transformation = tr.uniformScale(0.05)
 
+
 def recover(particle):
+    particle.ignore = True
     particle.state = 'recovered'
     color = (0.5, 0.5, 0.5)  # Gray
     particle.gpuShape = es.toGPUShape(
         my.createCircle(30, *color, particle.radius_circle, particle.proportion)
     )
+
 
 def select_event(particle):
     particle.activeEvent = np.random.choice(
