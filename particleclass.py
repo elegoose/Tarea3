@@ -37,6 +37,14 @@ class Particle:
 
         self.controller = None
 
+        self.go_to_center_prob = 0
+
+        self.has_to_go = False
+
+        self.daysRecovered = 0
+
+        self.days_to_be_susceptible = 0
+
     def set_box_limits(self, width_square, height_square, radius_circle, proportion):
 
         self.width_square = width_square
@@ -85,8 +93,6 @@ class Particle:
                                           ])
                 if choice == 'die':
                     kill(self)
-                    self.controller.deathCount += 1
-                    self.controller.infectedCount -= 1
             else:
                 choice = np.random.choice(['die', 'live'],
                                           p=[
@@ -95,17 +101,26 @@ class Particle:
                                           ])
                 if choice == 'die':
                     kill(self)
-                    self.controller.deathCount += 1
-                    self.controller.infectedCount -= 1
                 else:
                     recover(self)
-                    self.controller.recoveredCount += 1
-                    self.controller.infectedCount -= 1
 
-        if self.state != 'dead':
-            apply_active_event(self)
-        self.x += self.velocity * self.x_vector
-        self.y += self.velocity * self.y_vector
+        if self.days_to_be_susceptible == self.daysRecovered and self.state == 'recovered':
+            make_susceptible_again(self)
+
+        if self.has_to_go and self.state != 'dead':
+            go_to_center(self)
+        else:
+
+            if self.dayPassed and self.activeEvent is None:
+                self.has_to_go = np.random.choice([True, False], p=[self.go_to_center_prob, 1 - self.go_to_center_prob])
+            else:
+                self.has_to_go = False
+
+            if self.state != 'dead':
+                apply_active_event(self)
+            self.x += self.velocity * self.x_vector
+            self.y += self.velocity * self.y_vector
+
         if self.x + self.radius_circle >= self.width_square / 2 or \
                 self.x - self.radius_circle <= -self.width_square / 2:
             self.x_vector = - self.x_vector
@@ -126,6 +141,8 @@ class Particle:
 
 
 def kill(particle):
+    particle.controller.deathCount += 1
+    particle.controller.infectedCount -= 1
     particle.ignore = True
     particle.state = 'dead'
     particle.pipeline = es.SimpleTextureTransformShaderProgram()
@@ -135,6 +152,9 @@ def kill(particle):
 
 
 def recover(particle):
+    particle.controller.recoveredCount += 1
+    particle.controller.infectedCount -= 1
+    particle.daysInfected = 0
     particle.ignore = True
     particle.state = 'recovered'
     color = (0.5, 0.5, 0.5)  # Gray
@@ -142,6 +162,16 @@ def recover(particle):
         my.createCircle(30, *color, particle.radius_circle, particle.proportion)
     )
 
+def make_susceptible_again(particle):
+    particle.daysRecovered = 0
+    particle.controller.recoveredCount -= 1
+    particle.controller.susceptibleCount += 1
+    particle.ignore = False
+    particle.state = 'susceptible'
+    color = (0, 0, 1) # Blue
+    particle.gpuShape = es.toGPUShape(
+            my.createCircle(30, *color, particle.radius_circle, particle.proportion)
+        )
 
 def select_event(particle):
     particle.activeEvent = np.random.choice(
@@ -158,6 +188,31 @@ def apply_active_event(particle):
         vertical_acceleration(particle)
     elif particle.activeEvent == 'vertical_deceleration':
         vertical_deceleration(particle)
+
+
+def go_to_center(particle):
+    particle.velocity = particle.initial_velocity*1.5
+    particle.acceleration_factor = 1
+    if -0.01 <= particle.x <= 0.01 and \
+            -0.01 <= particle.y <= 0.01:
+        particle.velocity = particle.initial_velocity
+        particle.x_vector = np.random.choice([-1, 1])
+
+        particle.y_vector = np.random.choice([-1, 1])
+        particle.has_to_go = False
+    if -0.01 <= particle.x <= 0.01:
+        pass
+    elif particle.x > 0:
+        particle.x -= particle.velocity * particle.x_vector
+    else:
+        particle.x += particle.velocity * particle.x_vector
+
+    if -0.01 <= particle.y <= 0.01:
+        pass
+    elif particle.y > 0:
+        particle.y -= particle.velocity * particle.proportion * particle.y_vector
+    else:
+        particle.y += particle.velocity * particle.proportion * particle.y_vector
 
 
 def change_direction(particle):
